@@ -114,7 +114,7 @@ bash test/run.sh                  # the whole fixture suite, needs bash and jq
 bash test/gen-dispatch-fixtures.sh  # regenerate testdata/fixtures/dispatch
 ```
 
-CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the same script and then the real action on each event type, with the `dispatch` job pointing `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` (step `env`) at the recorded dispatch fixtures; `test/run.sh` covers those cases too, without a runner; the aggregate **CI OK** job gates merging. Fixtures: [`testdata/README.md`](testdata/README.md).
+CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the same script (the `script` job, which covers the `repository_dispatch` and `workflow_dispatch` fixtures by setting `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH`) and then the real action on each event type through the `event` input. The runner resets `GITHUB_EVENT_*` for every step, so a step `env` cannot replay a dispatch through the real action; the aggregate **CI OK** job gates merging. Fixtures: [`testdata/README.md`](testdata/README.md).
 
 ## License
 
