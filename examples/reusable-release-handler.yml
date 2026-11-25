@@ -1,0 +1,44 @@
+# A reusable workflow (workflow_call) that other workflows in your organisation call
+# with their own filters. Save it as .github/workflows/release-handler.yml.
+#
+# Caller:
+#   on:
+#     repository_dispatch:
+#       types: [angelia.release.published]
+#   jobs:
+#     handle:
+#       uses: octo-org/shared/.github/workflows/release-handler.yml@main
+#       with:
+#         package: requests
+name: release-handler
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: Package glob(s) to react to
+        type: string
+        default: ""
+      ecosystem:
+        type: string
+        default: ""
+    outputs:
+      version:
+        description: The matched version, empty when nothing matched
+        value: ${{ jobs.handle.outputs.version }}
+
+permissions: {}
+
+jobs:
+  handle:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.matched == 'true' && steps.release.outputs.version || '' }}
+    steps:
+      # In a called workflow, github.event is the caller's event, so the action
+      # reads the dispatch payload without being given it.
+      - id: release
+        uses: angelia-dev/actions/on-release@v1
+        with:
+          package: ${{ inputs.package }}
+          ecosystem: ${{ inputs.ecosystem }}

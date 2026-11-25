@@ -1,0 +1,24 @@
+# mode|fixture|ecosystem|package|version|previous_version|bump|prerelease|purl|release_url|event_type
+# Hand-written expectations; empty = null in the event. mode: event (the event input), repository_dispatch, workflow_dispatch.
+event|spec-envelope/published-pypi.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|dev.angelia.release.published.v1
+event|spec-envelope/published-pypi-extension-attribute.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|dev.angelia.release.published.v1
+event|spec-envelope/prerelease-npm-scoped.json|npm|@angular/core|18.0.0-rc.1|18.0.0-rc.0|prerelease|true|pkg:npm/%40angular/core@18.0.0-rc.1|https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1|dev.angelia.release.prerelease.v1
+event|spec-envelope/yanked-pypi.json|pypi|example-lib|0.4.1|0.4.0|patch|false|pkg:pypi/example-lib@0.4.1|https://pypi.org/project/example-lib/0.4.1/|dev.angelia.release.yanked.v1
+event|spec-data/published-pypi.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|dev.angelia.release.published.v1
+event|spec-data/published-pypi-unknown-fields.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|dev.angelia.release.published.v1
+event|spec-data/published-pypi-dotted-name.json|pypi|zope-interface|7.1.1|7.1.0|patch|false|pkg:pypi/zope.interface@7.1.1|https://pypi.org/project/zope-interface/7.1.1/|dev.angelia.release.published.v1
+event|spec-data/published-npm.json|npm|left-pad|1.3.0|1.2.0|minor|false|pkg:npm/left-pad@1.3.0|https://www.npmjs.com/package/left-pad/v/1.3.0|dev.angelia.release.published.v1
+event|spec-data/published-github-release.json|github-release|cli/cli|v2.62.0|v2.61.0|minor|false|pkg:github/cli/cli@v2.62.0|https://github.com/cli/cli/releases/tag/v2.62.0|dev.angelia.release.published.v1
+event|spec-data/published-backport-crates.json|crates|example-crate|1.9.4|1.9.3|patch|false|pkg:cargo/example-crate@1.9.4|https://crates.io/crates/example-crate/1.9.4|dev.angelia.release.published.v1
+event|spec-data/published-first-version-no-purl.json|http-json|example-tool|2026.10.1|||false|||dev.angelia.release.published.v1
+event|spec-data/prerelease-npm-scoped.json|npm|@angular/core|18.0.0-rc.1|18.0.0-rc.0|prerelease|true|pkg:npm/%40angular/core@18.0.0-rc.1|https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1|dev.angelia.release.prerelease.v1
+event|spec-data/yanked-pypi.json|pypi|example-lib|0.4.1|0.4.0|patch|false|pkg:pypi/example-lib@0.4.1|https://pypi.org/project/example-lib/0.4.1/|dev.angelia.release.yanked.v1
+repository_dispatch|dispatch/repository-dispatch-published.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|dev.angelia.release.published.v1
+repository_dispatch|dispatch/repository-dispatch-prerelease.json|npm|@angular/core|18.0.0-rc.1|18.0.0-rc.0|prerelease|true|pkg:npm/%40angular/core@18.0.0-rc.1|https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1|dev.angelia.release.prerelease.v1
+repository_dispatch|dispatch/repository-dispatch-yanked.json|pypi|example-lib|0.4.1|0.4.0|patch|false|pkg:pypi/example-lib@0.4.1|https://pypi.org/project/example-lib/0.4.1/|dev.angelia.release.yanked.v1
+repository_dispatch|dispatch/repository-dispatch-full-type.json|npm|@angular/core|18.0.0-rc.1|18.0.0-rc.0|prerelease|true|pkg:npm/%40angular/core@18.0.0-rc.1|https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1|dev.angelia.release.prerelease.v1
+repository_dispatch|dispatch/repository-dispatch-custom-event-type.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|
+workflow_dispatch|dispatch/workflow-dispatch-event-input.json|pypi|requests|2.33.0|2.32.5|minor|false|pkg:pypi/requests@2.33.0|https://pypi.org/project/requests/2.33.0/|dev.angelia.release.published.v1
+workflow_dispatch|dispatch/workflow-dispatch-event-input-yanked.json|pypi|example-lib|0.4.1|0.4.0|patch|false|pkg:pypi/example-lib@0.4.1|https://pypi.org/project/example-lib/0.4.1/|dev.angelia.release.yanked.v1
+workflow_dispatch|dispatch/workflow-dispatch-flat-inputs.json|pypi|requests|2.33.0|||false|||
+workflow_dispatch|dispatch/workflow-dispatch-flat-inputs-full.json|npm|@angular/core|18.0.0-rc.1|18.0.0-rc.0|prerelease|true|pkg:npm/%40angular/core@18.0.0-rc.1|https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1|dev.angelia.release.prerelease.v1

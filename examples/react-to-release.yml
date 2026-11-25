@@ -1,0 +1,48 @@
+# Copy to .github/workflows/ in the repository the Angelia github-dispatch sink targets.
+#
+# Sink side (Angelia watch file):
+#   sinks:
+#     - name: build-on-release
+#       kind: github-dispatch
+#       config:
+#         repo: octo-org/octo-app
+#         token_ref: gh-dispatch-token
+#         event_type: '{{.type}}'   # the full CloudEvents type; see README
+name: react-to-release
+
+on:
+  repository_dispatch:
+    types:
+      - dev.angelia.release.published.v1
+      - dev.angelia.release.prerelease.v1
+      - dev.angelia.release.yanked.v1
+  workflow_dispatch:
+    inputs:
+      event:
+        description: Angelia release event as JSON (CloudEvents envelope or its data)
+        required: true
+
+permissions: {}
+
+jobs:
+  react:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release
+        uses: angelia-dev/actions/on-release@v1
+        with:
+          ecosystem: pypi,npm
+          package: |
+            requests
+            @angular/*
+          bump: minor,major
+          include-prereleases: "false"
+
+      - name: Bump
+        if: steps.release.outputs.matched == 'true'
+        # Pass event data through env, never inline in the script: it comes from a registry.
+        env:
+          PACKAGE: ${{ steps.release.outputs.package }}
+          VERSION: ${{ steps.release.outputs.version }}
+          URL: ${{ steps.release.outputs.release_url }}
+        run: echo "bump $PACKAGE to $VERSION ($URL)"

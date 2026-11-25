@@ -1,10 +1,118 @@
 # Angelia GitHub Actions
 
-GitHub Actions to consume Angelia release events in workflows.
+GitHub Actions to consume [Angelia](https://github.com/angelia-dev) release events in workflows.
 
-**Status:** pre-alpha / Phase 0. Nothing here is usable yet.
+**Status:** pre-alpha / Phase 0. Tags (`v1`) are not published yet.
 
-Part of [Angelia](https://github.com/angelia-dev), the self-hosted release event bus. See the [core repository](https://github.com/angelia-dev/angelia) for the design docs.
+| Action | Use |
+|---|---|
+| [`on-release`](#on-release) | Read a release event, validate it, expose it as outputs, filter it. |
+
+## on-release
+
+```yaml
+on:
+  repository_dispatch:
+    types: [dev.angelia.release.published.v1, dev.angelia.release.prerelease.v1, dev.angelia.release.yanked.v1]
+jobs:
+  react:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - id: release
+        uses: angelia-dev/actions/on-release@v1
+        with:
+          ecosystem: pypi
+          package: requests
+      - if: steps.release.outputs.matched == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: echo "requests $VERSION"
+```
+
+Full workflows: [`examples/react-to-release.yml`](examples/react-to-release.yml) and the reusable workflow [`examples/reusable-release-handler.yml`](examples/reusable-release-handler.yml).
+
+It is a composite action in bash and `jq` (both preinstalled on GitHub-hosted runners): no build step, no `node_modules`, no third-party action, no network access, no token. A job that only uses it needs `permissions: {}`.
+
+### Where the event comes from
+
+In this order:
+
+1. The **`event` input**, a JSON string: a CloudEvents envelope, its `data` object, or a `client_payload` object.
+2. **`repository_dispatch`**: `github.event.client_payload`, the flat payload of Angelia's [github-dispatch sink](https://github.com/angelia-dev/angelia/blob/main/docs/github-dispatch.md), and `github.event.action` (the sink's `event_type`) for the event type.
+3. **`workflow_dispatch`**: the input named by `event-input` (default `event`) as a JSON string, for runs you start by hand. Otherwise the flat inputs the sink can render one by one, each a string: `type` (`{{.type}}`), `source`, `package`, `version`, `previous_version`, `bump`, `prerelease`, `yanked`, `purl`, `release_url`. An empty string means null. Sink inputs are cut to 1024 bytes, so do not try to carry the whole event in one.
+
+Any other trigger needs the `event` input.
+
+### What the sink sends, and what that means for the type
+
+For `repository_dispatch` the sink sends `event_type` (a template, default `angelia.release.published`) and a **flat** `client_payload`: `event_id`, `source`, `package`, `version`, `previous_version`, `bump`, `purl`, `release_url`, `watch`, and `truncated` when a value was cut. It carries **neither the event type nor `prerelease`**.
+
+The action therefore takes the type from `event_type` when it is `angelia.release.<published|prerelease|yanked>` or the full CloudEvents type. **Set the sink's `event_type: '{{.type}}'`** (the full type, such as `dev.angelia.release.prerelease.v1`) so that `event_type`, `prerelease`, `yanked` and the `event-types` filter are exact. With the default fixed `event_type`, every event looks like `published`; `prerelease` is then true only when `bump` is `prerelease`.
+
+### Inputs
+
+| Input | Default | Meaning |
+|---|---|---|
+| `event` | `""` | The event as JSON. Overrides the triggering event. |
+| `event-input` | `event` | Name of the `workflow_dispatch` input holding the event JSON. |
+| `ecosystem` | `""` | Comma-separated source kinds to accept (`pypi`, `npm`, `github-release`, ...). Empty: all. |
+| `package` | `""` | Comma- or newline-separated globs on the package name (`*`, `?`; `*` also matches `/`). Empty: all. |
+| `bump` | `""` | Comma-separated bump kinds: `major`, `minor`, `patch`, `prerelease`, `other`, and `none` for an event with no bump (first version). Empty: all. |
+| `event-types` | `""` | Comma-separated `published`, `prerelease`, `yanked`. Empty: all. An event of unknown type does not match a non-empty list. |
+| `include-prereleases` | `true` | `false`: pre-releases do not match. |
+
+All filters must match (AND); inside one filter any entry may match (OR).
+
+### Outputs
+
+Set on every successful run, matched or not. A missing value (`null` in the event) is an empty string.
+
+| Output | Value |
+|---|---|
+| `matched` | `true` when every filter passed, else `false`. |
+| `event_type` | Full type, e.g. `dev.angelia.release.published.v1`. Empty if unknown (see above). A bare `data` object gets the type implied by its `prerelease` and `yanked` flags. |
+| `event_id` | Event id (ULID); empty for a bare `data` object. Delivery is at-least-once, deduplicate on it. |
+| `ecosystem` | `data.source`: `pypi`, `npm`, ... |
+| `package` | `data.package` |
+| `version` | `data.version`, as the registry wrote it |
+| `previous_version` | `data.previous_version` |
+| `bump` | `major`, `minor`, `patch`, `prerelease`, `other` |
+| `prerelease` | `true` / `false` |
+| `yanked` | `true` for a `release.yanked` event |
+| `purl` | `data.purl` |
+| `release_url` | `data.urls.release` |
+
+The output is named `event_type` (underscore) like every other output.
+
+### Event types covered
+
+`dev.angelia.release.published.v1`, `dev.angelia.release.prerelease.v1` and `dev.angelia.release.yanked.v1` are all the types in the [spec](https://github.com/angelia-dev/spec) (release schema v1, spec 0.10.0); each is tested as envelope, as bare `data` and as `repository_dispatch`.
+
+### Verification and trust
+
+The spec and the sink define **no signature or HMAC for `repository_dispatch` or `workflow_dispatch`**: signing (Standard Webhooks) belongs to the webhook sink only. The action does not invent one. A dispatch can only be created by someone holding a token with `contents: write` (`repository_dispatch`) or `actions: write` (`workflow_dispatch`) on your repository, and GitHub runs `repository_dispatch` workflows only from the default branch. **That token is the trust boundary**: keep it as narrow as the Angelia docs say and do not reuse it.
+
+What the action does check, and fails the step on:
+
+- an envelope: `specversion` is `1.0`, `type` is one of the three `dev.angelia.release.*.v1`, `id` is a ULID, `subject` is present, `datacontenttype` (if present) is `application/json`, `data` is an object;
+- `source`, `package` and `version` are non-blank strings; `previous_version`, `bump`, `purl`, `release_url` are strings or null; `bump` is a known value; `prerelease` and `yanked` are booleans if present;
+- no value contains control characters.
+
+This is a shape check, not full JSON Schema validation (the spec repository's CI does that). Event data is data from a registry: the action reads inputs through environment variables and its error messages never echo event values. In your own workflow pass outputs through `env:` too, never `${{ }}` inside a `run:` script.
+
+### Versioning: the `v1` tag
+
+Releases are SemVer tags (`v1.2.3`) on `main`, and a moving major tag `v1` that is force-moved to the latest `v1.x.y`. Use `@v1` to get compatible fixes, or a full commit SHA to pin. Breaking changes to inputs or outputs (removal, rename, changed meaning) go in `v2`; new optional inputs and outputs are minor. The action follows the Angelia release schema: a new event type or field is additive; a `.v2` event type needs a new major here.
+
+## Development
+
+```
+bash test/run.sh                  # the whole fixture suite, needs bash and jq
+bash test/gen-dispatch-fixtures.sh  # regenerate testdata/fixtures/dispatch
+```
+
+CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the same script and then the real action on each event type; the aggregate **CI OK** job gates merging. Fixtures: [`testdata/README.md`](testdata/README.md).
 
 ## License
 

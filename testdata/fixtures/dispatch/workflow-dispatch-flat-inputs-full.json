@@ -1,0 +1,14 @@
+{
+  "inputs": {
+    "type": "dev.angelia.release.prerelease.v1",
+    "source": "npm",
+    "package": "@angular/core",
+    "version": "18.0.0-rc.1",
+    "previous_version": "18.0.0-rc.0",
+    "bump": "prerelease",
+    "prerelease": "true",
+    "purl": "pkg:npm/%40angular/core@18.0.0-rc.1",
+    "release_url": "https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1"
+  },
+  "ref": "refs/heads/main"
+}
