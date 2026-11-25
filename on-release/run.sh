@@ -45,14 +45,17 @@ fi
 norm=$(jq -c --arg action "$action" '
   def blank: type != "string" or test("^\\s*$");
   def short: capture("^dev\\.angelia\\.release\\.(?<k>published|prerelease|yanked)\\.v1$").k;
-  def from_action:
-    (capture("^(dev\\.)?angelia\\.release\\.(?<k>published|prerelease|yanked)(\\.v1)?$") | "dev.angelia.release." + .k + ".v1") // null;
+  # Only the full CloudEvents type counts (event_type set to the .type template variable).
+  # The sinks default event_type, angelia.release.published, is sent for every
+  # event, yanked ones included, so it says nothing and is treated as unknown.
+  def from_action: if type == "string" and ([short] | length) > 0 then . else null end;
+  def ulid: type == "string" and test("^[0-9A-HJKMNP-TV-Z]{26}$");
 
   (if type == "object" then . else error("the event is not a JSON object") end)
   | if has("specversion") then
       (if .specversion != "1.0" then error("specversion must be 1.0") else . end)
       | (if (.type | type) != "string" or ((.type | short?) // null) == null then error("type must be dev.angelia.release.(published|prerelease|yanked).v1") else . end)
-      | (if (.id | type) != "string" or (.id | test("^[0-9A-HJKMNP-TV-Z]{26}$") | not) then error("id must be a ULID") else . end)
+      | (if (.id | ulid | not) then error("id must be a ULID") else . end)
       | (if (.subject | blank) then error("subject is required") else . end)
       | (if has("datacontenttype") and .datacontenttype != "application/json" then error("datacontenttype must be application/json") else . end)
       | (if (.data | type) != "object" then error("data must be an object") else . end)
@@ -60,10 +63,12 @@ norm=$(jq -c --arg action "$action" '
     else
       # A client_payload, a bare data object, or workflow_dispatch inputs, which
       # are all strings: "" stands for null and "true"/"false" for booleans.
-      (with_entries(if (.value | type) == "string" and (.key | IN("previous_version","bump","purl","release_url")) and .value == "" then .value = null
+      (with_entries(select(((.key | IN("prerelease","yanked")) and .value == "") | not))
+       | with_entries(if (.value | type) == "string" and (.key | IN("previous_version","bump","purl","release_url")) and .value == "" then .value = null
                     elif (.value | type) == "string" and (.key | IN("prerelease","yanked")) and (.value | IN("true","false")) then .value = (.value == "true")
                     else . end)) as $d
-      | {type: (($action | from_action) // (($d.type? // "") | if type == "string" then from_action else null end)), id: ($d.event_id // ""), d: $d}
+      | (if ($d.event_id // null) != null and ($d.event_id | ulid | not) then error("event_id must be a ULID or null") else . end)
+      | {type: (($action | from_action) // ($d.type? | from_action)), id: ($d.event_id // ""), d: $d}
     end
   | .d as $d
   | ($d | has("urls")) as $full
@@ -90,6 +95,7 @@ norm=$(jq -c --arg action "$action" '
       bump: ($d.bump // ""),
       prerelease: (if ($d.prerelease | type) == "boolean" then $d.prerelease
                    elif $type != null and ($type | short) == "prerelease" then true
+                   elif $type != null and ($type | short) == "published" then false
                    else ($d.bump // "") == "prerelease" end),
       yanked: (if ($d.yanked | type) == "boolean" then $d.yanked else ($type != null and ($type | short) == "yanked") end),
       purl: ($d.purl // ""),
@@ -133,6 +139,10 @@ glob_list() {
   set +f
   [[ $any -eq 1 || $found -eq 0 ]]
 }
+
+if [[ -z $(get event_type) ]]; then
+  echo "::warning title=angelia/on-release::The event type is unknown, so event_type is empty and event-types filters do not match. Set the Angelia github-dispatch sink's event_type to '{{.type}}' to send it."
+fi
 
 ecosystem=$(get ecosystem) package=$(get package) bump=$(get bump)
 prerelease=$(get prerelease) event_type=$(get event_type)

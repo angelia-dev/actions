@@ -1,0 +1,20 @@
+{
+  "action": "angelia.release.published",
+  "client_payload": {
+    "event_id": "01JBXA1B2C3D4E5F6G7H8J9K0M",
+    "source": "pypi",
+    "package": "example-lib",
+    "version": "0.4.1",
+    "previous_version": "0.4.0",
+    "bump": "patch",
+    "purl": "pkg:pypi/example-lib@0.4.1",
+    "release_url": "https://pypi.org/project/example-lib/0.4.1/",
+    "watch": "example-lib"
+  },
+  "repository": {
+    "full_name": "octo-org/octo-app"
+  },
+  "sender": {
+    "login": "octo-bot"
+  }
+}

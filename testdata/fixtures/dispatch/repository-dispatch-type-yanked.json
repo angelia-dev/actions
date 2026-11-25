@@ -1,5 +1,5 @@
 {
-  "action": "angelia.release.yanked",
+  "action": "dev.angelia.release.yanked.v1",
   "client_payload": {
     "event_id": "01JBXA1B2C3D4E5F6G7H8J9K0M",
     "source": "pypi",

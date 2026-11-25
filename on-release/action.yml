@@ -22,13 +22,13 @@ inputs:
   ecosystem:
     description: >-
       Comma-separated source kinds to accept (`pypi`, `npm`, `github-release`,
-      ...). Empty accepts all.
+      ...), compared as exact strings. Empty accepts all.
     required: false
     default: ""
   package:
     description: >-
-      Comma- or newline-separated glob patterns for the package name (`*` and `?`;
-      `*` also matches `/`). Empty accepts all.
+      Comma- or newline-separated bash patterns for the package name (`*`, `?`,
+      `[...]` classes; `*` also matches `/`). Empty accepts all.
     required: false
     default: ""
   bump:
@@ -56,7 +56,7 @@ outputs:
   event_type:
     description: >-
       Full CloudEvents type (`dev.angelia.release.published.v1`, ...), or empty
-      when the event does not tell and cannot be inferred.
+      when unknown (a dispatch whose sink event_type is not `{{.type}}`).
     value: ${{ steps.parse.outputs.event_type }}
   event_id:
     description: Event id (a ULID). Empty for a bare `data` object. Deduplicate on it.

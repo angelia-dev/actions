@@ -25,10 +25,16 @@ wd() { # wd <envelope.json> <outfile>: workflow_dispatch with the event as one J
   jq '{inputs: {event: tojson}, ref: "refs/heads/main", repository: {full_name: "octo-org/octo-app"}}' "$1" >"$out/$2"
 }
 
-rd $fx/spec-envelope/published-pypi.json angelia.release.published repository-dispatch-published.json
-rd $fx/spec-envelope/prerelease-npm-scoped.json angelia.release.prerelease repository-dispatch-prerelease.json
-rd $fx/spec-envelope/yanked-pypi.json angelia.release.yanked repository-dispatch-yanked.json
-rd $fx/spec-envelope/prerelease-npm-scoped.json dev.angelia.release.prerelease.v1 repository-dispatch-full-type.json
+# The sink's default event_type is sent for every event, yanked ones included.
+d=angelia.release.published
+rd $fx/spec-envelope/published-pypi.json $d repository-dispatch-default-published.json
+rd $fx/spec-envelope/prerelease-npm-scoped.json $d repository-dispatch-default-prerelease.json
+rd $fx/spec-envelope/yanked-pypi.json $d repository-dispatch-default-yanked.json
+# event_type: '{{.type}}', the full CloudEvents type
+for k in published:published-pypi prerelease:prerelease-npm-scoped yanked:yanked-pypi; do
+  rd $fx/spec-envelope/${k#*:}.json dev.angelia.release.${k%%:*}.v1 repository-dispatch-type-${k%%:*}.json
+done
+# a custom template
 rd $fx/spec-envelope/published-pypi.json release.pypi repository-dispatch-custom-event-type.json
 wd $fx/spec-envelope/published-pypi.json workflow-dispatch-event-input.json
 wd $fx/spec-envelope/yanked-pypi.json workflow-dispatch-event-input-yanked.json

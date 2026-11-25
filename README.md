@@ -30,6 +30,8 @@ jobs:
         run: echo "requests $VERSION"
 ```
 
+This requires the Angelia sink to be configured with `event_type: '{{.type}}'` (see [below](#what-the-sink-sends-and-what-that-means-for-the-type)); with the sink's default `event_type` the action cannot tell the types apart.
+
 Full workflows: [`examples/react-to-release.yml`](examples/react-to-release.yml) and the reusable workflow [`examples/reusable-release-handler.yml`](examples/reusable-release-handler.yml).
 
 It is a composite action in bash and `jq` (both preinstalled on GitHub-hosted runners): no build step, no `node_modules`, no third-party action, no network access, no token. A job that only uses it needs `permissions: {}`.
@@ -40,7 +42,7 @@ In this order:
 
 1. The **`event` input**, a JSON string: a CloudEvents envelope, its `data` object, or a `client_payload` object.
 2. **`repository_dispatch`**: `github.event.client_payload`, the flat payload of Angelia's [github-dispatch sink](https://github.com/angelia-dev/angelia/blob/main/docs/github-dispatch.md), and `github.event.action` (the sink's `event_type`) for the event type.
-3. **`workflow_dispatch`**: the input named by `event-input` (default `event`) as a JSON string, for runs you start by hand. Otherwise the flat inputs the sink can render one by one, each a string: `type` (`{{.type}}`), `source`, `package`, `version`, `previous_version`, `bump`, `prerelease`, `yanked`, `purl`, `release_url`. An empty string means null. Sink inputs are cut to 1024 bytes, so do not try to carry the whole event in one.
+3. **`workflow_dispatch`**: the input named by `event-input` (default `event`) as a JSON string, for runs you start by hand. Otherwise the flat inputs the sink can render one by one, each a string: `type` (`{{.type}}`), `source`, `package`, `version`, `previous_version`, `bump`, `prerelease`, `yanked`, `purl`, `release_url`. An empty string means null (also for `prerelease` and `yanked`). Sink inputs are cut to 1024 bytes, so do not try to carry the whole event in one.
 
 Any other trigger needs the `event` input.
 
@@ -48,7 +50,7 @@ Any other trigger needs the `event` input.
 
 For `repository_dispatch` the sink sends `event_type` (a template, default `angelia.release.published`) and a **flat** `client_payload`: `event_id`, `source`, `package`, `version`, `previous_version`, `bump`, `purl`, `release_url`, `watch`, and `truncated` when a value was cut. It carries **neither the event type nor `prerelease`**.
 
-The action therefore takes the type from `event_type` when it is `angelia.release.<published|prerelease|yanked>` or the full CloudEvents type. **Set the sink's `event_type: '{{.type}}'`** (the full type, such as `dev.angelia.release.prerelease.v1`) so that `event_type`, `prerelease`, `yanked` and the `event-types` filter are exact. With the default fixed `event_type`, every event looks like `published`; `prerelease` is then true only when `bump` is `prerelease`.
+The action therefore takes the type from the dispatch `event_type`, and **only the full CloudEvents type counts**. **Set the sink's `event_type: '{{.type}}'`**, which renders `dev.angelia.release.prerelease.v1` and so on. The sink's default, `angelia.release.published`, is sent for every event, yanked ones included, so it says nothing: the action treats any other `event_type` (that default included) as an unknown type. Then `event_type` is empty, every `event-types` filter fails closed (does not match), `yanked` is `false`, `prerelease` is true only when `bump` is `prerelease`, and the step prints a `::warning::` telling you to set `event_type: '{{.type}}'`. A published type is never a prerelease, whatever `bump` says.
 
 ### Inputs
 
@@ -56,8 +58,8 @@ The action therefore takes the type from `event_type` when it is `angelia.releas
 |---|---|---|
 | `event` | `""` | The event as JSON. Overrides the triggering event. |
 | `event-input` | `event` | Name of the `workflow_dispatch` input holding the event JSON. |
-| `ecosystem` | `""` | Comma-separated source kinds to accept (`pypi`, `npm`, `github-release`, ...). Empty: all. |
-| `package` | `""` | Comma- or newline-separated globs on the package name (`*`, `?`; `*` also matches `/`). Empty: all. |
+| `ecosystem` | `""` | Comma-separated source kinds to accept (`pypi`, `npm`, `github-release`, ...), exact match. Empty: all. |
+| `package` | `""` | Comma- or newline-separated bash patterns on the package name: `*`, `?`, `[...]` classes (`*` also matches `/`; a pattern cannot contain a comma). Empty: all. |
 | `bump` | `""` | Comma-separated bump kinds: `major`, `minor`, `patch`, `prerelease`, `other`, and `none` for an event with no bump (first version). Empty: all. |
 | `event-types` | `""` | Comma-separated `published`, `prerelease`, `yanked`. Empty: all. An event of unknown type does not match a non-empty list. |
 | `include-prereleases` | `true` | `false`: pre-releases do not match. |
@@ -112,7 +114,7 @@ bash test/run.sh                  # the whole fixture suite, needs bash and jq
 bash test/gen-dispatch-fixtures.sh  # regenerate testdata/fixtures/dispatch
 ```
 
-CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the same script and then the real action on each event type; the aggregate **CI OK** job gates merging. Fixtures: [`testdata/README.md`](testdata/README.md).
+CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the same script and then the real action on each event type, with the `dispatch` job pointing `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` (step `env`) at the recorded dispatch fixtures; `test/run.sh` covers those cases too, without a runner; the aggregate **CI OK** job gates merging. Fixtures: [`testdata/README.md`](testdata/README.md).
 
 ## License
 

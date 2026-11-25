@@ -91,6 +91,22 @@ filter $pp true IN_ECOSYSTEM=pypi IN_PACKAGE='req*' IN_BUMP=minor IN_EVENT_TYPES
 run event $pp IN_ECOSYSTEM=npm && [[ $(out package) == requests ]] && ok || bad "outputs missing when unmatched"
 # a type filter cannot match an event of unknown type (custom dispatch event_type)
 run repository_dispatch "$fx/dispatch/repository-dispatch-custom-event-type.json" IN_EVENT_TYPES=published && [[ $(out matched) == false ]] && ok || bad "unknown type matched a type filter"
+# the sink's default event_type says nothing: unknown type, filters fail closed, a warning is printed
+for k in published prerelease yanked; do
+  run repository_dispatch "$fx/dispatch/repository-dispatch-default-$k.json" IN_EVENT_TYPES=$k && [[ $(out matched) == false && -z $(out event_type) ]] && grep -q '^::warning' "$tmp/log" && ok || bad "default event_type ($k) not failed closed with a warning"
+done
+run repository_dispatch "$fx/dispatch/repository-dispatch-type-published.json" && ! grep -q '^::warning' "$tmp/log" && ok || bad "warning on a typed event"
+# a published type is never a prerelease, whatever the bump says
+jq '.client_payload.bump = "prerelease"' "$fx/dispatch/repository-dispatch-type-published.json" >"$tmp/pub-bump.json"
+run repository_dispatch "$tmp/pub-bump.json" && [[ $(out prerelease) == false ]] && ok || bad "published event with bump=prerelease is a prerelease"
+# event_id: a ULID or null, nothing else
+jq '.client_payload.event_id = "not-a-ulid"' "$fx/dispatch/repository-dispatch-type-published.json" >"$tmp/bad-id.json"
+run repository_dispatch "$tmp/bad-id.json" && bad "bad event_id accepted" || ok
+jq '.client_payload.event_id = null' "$fx/dispatch/repository-dispatch-type-published.json" >"$tmp/null-id.json"
+run repository_dispatch "$tmp/null-id.json" && [[ -z $(out event_id) ]] && ok || bad "null event_id rejected"
+# flat inputs: "" means null for prerelease and yanked too
+jq '.inputs.prerelease = "" | .inputs.yanked = ""' "$fx/dispatch/workflow-dispatch-flat-inputs-full.json" >"$tmp/empty-flags.json"
+run workflow_dispatch "$tmp/empty-flags.json" && [[ $(out prerelease) == true ]] && ok || bad "empty prerelease/yanked inputs"
 # the event input overrides the trigger's own payload
 run repository_dispatch "$fx/dispatch/repository-dispatch-published.json" IN_EVENT="$(cat $yp)" && [[ $(out event_type) == *yanked* ]] && ok || bad "event input did not override"
 # a custom workflow_dispatch input name

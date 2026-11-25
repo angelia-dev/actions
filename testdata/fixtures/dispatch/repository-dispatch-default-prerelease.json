@@ -1,5 +1,5 @@
 {
-  "action": "angelia.release.prerelease",
+  "action": "angelia.release.published",
   "client_payload": {
     "event_id": "01JBXB2C3D4E5F6G7H8J9K0M1N",
     "source": "npm",

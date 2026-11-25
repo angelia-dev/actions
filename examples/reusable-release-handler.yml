@@ -1,10 +1,15 @@
 # A reusable workflow (workflow_call) that other workflows in your organisation call
 # with their own filters. Save it as .github/workflows/release-handler.yml.
 #
+# The Angelia github-dispatch sink must use event_type: '{{.type}}' (see the README).
+#
 # Caller:
 #   on:
 #     repository_dispatch:
-#       types: [angelia.release.published]
+#       types:
+#         - dev.angelia.release.published.v1
+#         - dev.angelia.release.prerelease.v1
+#         - dev.angelia.release.yanked.v1
 #   jobs:
 #     handle:
 #       uses: octo-org/shared/.github/workflows/release-handler.yml@main
