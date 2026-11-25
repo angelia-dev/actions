@@ -1,0 +1,8 @@
+{
+  "inputs": {
+    "package": "requests",
+    "version": "2.33.0",
+    "source": "pypi"
+  },
+  "ref": "refs/heads/main"
+}

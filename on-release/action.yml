@@ -1,0 +1,105 @@
+name: Angelia on-release
+description: >-
+  Read an Angelia release event (repository_dispatch, workflow_dispatch or an
+  explicit JSON input), validate its shape, expose it as step outputs and
+  apply filters.
+author: angelia-dev
+branding:
+  icon: package
+  color: blue
+
+inputs:
+  event:
+    description: >-
+      Release event as a JSON string (a CloudEvents envelope, its `data`, or a
+      repository_dispatch `client_payload`). Overrides the triggering event.
+    required: false
+    default: ""
+  event-input:
+    description: Name of the workflow_dispatch input that carries the event JSON.
+    required: false
+    default: event
+  ecosystem:
+    description: >-
+      Comma-separated source kinds to accept (`pypi`, `npm`, `github-release`,
+      ...), compared as exact strings. Empty accepts all.
+    required: false
+    default: ""
+  package:
+    description: >-
+      Comma- or newline-separated bash patterns for the package name (`*`, `?`,
+      `[...]` classes; `*` also matches `/`). Empty accepts all.
+    required: false
+    default: ""
+  bump:
+    description: >-
+      Comma-separated bump kinds to accept: major, minor, patch, prerelease,
+      other, or `none` for an event without a bump (first version). Empty
+      accepts all.
+    required: false
+    default: ""
+  event-types:
+    description: >-
+      Comma-separated release event types to accept: published, prerelease,
+      yanked. Empty accepts all. An event of unknown type matches only when empty.
+    required: false
+    default: ""
+  include-prereleases:
+    description: Set to `false` to not match pre-releases.
+    required: false
+    default: "true"
+
+outputs:
+  matched:
+    description: "`true` when the event passed every filter, else `false`."
+    value: ${{ steps.parse.outputs.matched }}
+  event_type:
+    description: >-
+      Full CloudEvents type (`dev.angelia.release.published.v1`, ...), or empty
+      when unknown (a dispatch whose sink event_type is not `{{.type}}`).
+    value: ${{ steps.parse.outputs.event_type }}
+  event_id:
+    description: Event id (a ULID). Empty for a bare `data` object. Deduplicate on it.
+    value: ${{ steps.parse.outputs.event_id }}
+  ecosystem:
+    description: Source kind (`pypi`, `npm`, `github-release`, ...).
+    value: ${{ steps.parse.outputs.ecosystem }}
+  package:
+    description: Package or repository name.
+    value: ${{ steps.parse.outputs.package }}
+  version:
+    description: Version as the registry wrote it.
+    value: ${{ steps.parse.outputs.version }}
+  previous_version:
+    description: Previous version, or empty when unknown.
+    value: ${{ steps.parse.outputs.previous_version }}
+  bump:
+    description: major, minor, patch, prerelease or other; empty when unknown.
+    value: ${{ steps.parse.outputs.bump }}
+  prerelease:
+    description: "`true` or `false`."
+    value: ${{ steps.parse.outputs.prerelease }}
+  yanked:
+    description: "`true` for a release.yanked event, else `false`."
+    value: ${{ steps.parse.outputs.yanked }}
+  purl:
+    description: Package URL, or empty.
+    value: ${{ steps.parse.outputs.purl }}
+  release_url:
+    description: Link to the release page, or empty.
+    value: ${{ steps.parse.outputs.release_url }}
+
+runs:
+  using: composite
+  steps:
+    - id: parse
+      shell: bash
+      env:
+        IN_EVENT: ${{ inputs.event }}
+        IN_EVENT_INPUT: ${{ inputs.event-input }}
+        IN_ECOSYSTEM: ${{ inputs.ecosystem }}
+        IN_PACKAGE: ${{ inputs.package }}
+        IN_BUMP: ${{ inputs.bump }}
+        IN_EVENT_TYPES: ${{ inputs.event-types }}
+        IN_INCLUDE_PRERELEASES: ${{ inputs.include-prereleases }}
+      run: bash "$GITHUB_ACTION_PATH/run.sh"

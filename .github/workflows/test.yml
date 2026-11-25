@@ -1,0 +1,143 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  script:
+    name: script tests (bash + jq)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - run: bash test/run.sh
+      - name: Dispatch fixtures are in sync with the generator
+        run: |
+          bash test/gen-dispatch-fixtures.sh
+          git diff --exit-code -- testdata/fixtures/dispatch
+
+  action:
+    name: action on ${{ matrix.fixture }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {id: "01JBX2A7C8D9E0F1G2H3J4K5M6", fixture: spec-envelope/published-pypi.json, type: dev.angelia.release.published.v1, ecosystem: pypi, package: requests, version: 2.33.0, previous: 2.32.5, bump: minor, prerelease: "false", yanked: "false", purl: "pkg:pypi/requests@2.33.0", url: "https://pypi.org/project/requests/2.33.0/"}
+          - {id: "01JBXB2C3D4E5F6G7H8J9K0M1N", fixture: spec-envelope/prerelease-npm-scoped.json, type: dev.angelia.release.prerelease.v1, ecosystem: npm, package: "@angular/core", version: 18.0.0-rc.1, previous: 18.0.0-rc.0, bump: prerelease, prerelease: "true", yanked: "false", purl: "pkg:npm/%40angular/core@18.0.0-rc.1", url: "https://www.npmjs.com/package/@angular/core/v/18.0.0-rc.1"}
+          - {id: "01JBXA1B2C3D4E5F6G7H8J9K0M", fixture: spec-envelope/yanked-pypi.json, type: dev.angelia.release.yanked.v1, ecosystem: pypi, package: example-lib, version: 0.4.1, previous: 0.4.0, bump: patch, prerelease: "false", yanked: "true", purl: "pkg:pypi/example-lib@0.4.1", url: "https://pypi.org/project/example-lib/0.4.1/"}
+          - {id: "", fixture: spec-data/published-first-version-no-purl.json, type: dev.angelia.release.published.v1, ecosystem: http-json, package: example-tool, version: 2026.10.1, previous: "", bump: "", prerelease: "false", yanked: "false", purl: "", url: ""}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: read
+        env:
+          FIXTURE: ${{ matrix.fixture }}
+        run: echo "json=$(jq -c . "testdata/fixtures/$FIXTURE")" >>"$GITHUB_OUTPUT"
+      - id: on-release
+        uses: ./on-release
+        with:
+          event: ${{ steps.read.outputs.json }}
+      - name: Assert outputs
+        env:
+          GOT: ${{ toJSON(steps.on-release.outputs) }}
+          WANT_ID: ${{ matrix.id }}
+          WANT_TYPE: ${{ matrix.type }}
+          WANT_ECOSYSTEM: ${{ matrix.ecosystem }}
+          WANT_PACKAGE: ${{ matrix.package }}
+          WANT_VERSION: ${{ matrix.version }}
+          WANT_PREVIOUS: ${{ matrix.previous }}
+          WANT_BUMP: ${{ matrix.bump }}
+          WANT_PRERELEASE: ${{ matrix.prerelease }}
+          WANT_YANKED: ${{ matrix.yanked }}
+          WANT_PURL: ${{ matrix.purl }}
+          WANT_URL: ${{ matrix.url }}
+        run: |
+          check() { # check <output> <want>
+            got=$(jq -r --arg k "$1" '.[$k]' <<<"$GOT")
+            [[ $got == "$2" ]] || { echo "::error::$1: got '$got', want '$2'"; exit 1; }
+          }
+          check matched true
+          check event_type "$WANT_TYPE"
+          check event_id "$WANT_ID"
+          check ecosystem "$WANT_ECOSYSTEM"
+          check package "$WANT_PACKAGE"
+          check version "$WANT_VERSION"
+          check previous_version "$WANT_PREVIOUS"
+          check bump "$WANT_BUMP"
+          check prerelease "$WANT_PRERELEASE"
+          check yanked "$WANT_YANKED"
+          check purl "$WANT_PURL"
+          check release_url "$WANT_URL"
+
+  filters:
+    name: action filters
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: read
+        run: echo "json=$(jq -c . testdata/fixtures/spec-envelope/prerelease-npm-scoped.json)" >>"$GITHUB_OUTPUT"
+      - id: hit
+        uses: ./on-release
+        with:
+          event: ${{ steps.read.outputs.json }}
+          ecosystem: npm,pypi
+          package: "@angular/*"
+          bump: prerelease
+          event-types: prerelease
+      - id: no-prerelease
+        uses: ./on-release
+        with:
+          event: ${{ steps.read.outputs.json }}
+          include-prereleases: "false"
+      - id: wrong-ecosystem
+        uses: ./on-release
+        with:
+          event: ${{ steps.read.outputs.json }}
+          ecosystem: pypi
+      - name: Assert
+        env:
+          HIT: ${{ steps.hit.outputs.matched }}
+          NO_PRE: ${{ steps.no-prerelease.outputs.matched }}
+          WRONG: ${{ steps.wrong-ecosystem.outputs.matched }}
+        run: |
+          [[ $HIT == true && $NO_PRE == false && $WRONG == false ]] || { echo "::error::filters: $HIT $NO_PRE $WRONG"; exit 1; }
+
+  invalid:
+    name: action rejects an invalid event
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: read
+        run: echo "json=$(jq -c . testdata/fixtures/spec-invalid/envelope-bad-specversion.json)" >>"$GITHUB_OUTPUT"
+      - id: bad
+        uses: ./on-release
+        continue-on-error: true
+        with:
+          event: ${{ steps.read.outputs.json }}
+      - name: Assert the step failed
+        env:
+          OUTCOME: ${{ steps.bad.outcome }}
+        run: '[[ $OUTCOME == failure ]]'
+
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [script, action, filters, invalid]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do [[ $r == success ]] || { echo "::error::a job finished with '$r'"; exit 1; }; done

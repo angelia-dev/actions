@@ -1,0 +1,20 @@
+{
+  "action": "dev.angelia.release.published.v1",
+  "client_payload": {
+    "event_id": "01JBX2A7C8D9E0F1G2H3J4K5M6",
+    "source": "pypi",
+    "package": "requests",
+    "version": "2.33.0",
+    "previous_version": "2.32.5",
+    "bump": "minor",
+    "purl": "pkg:pypi/requests@2.33.0",
+    "release_url": "https://pypi.org/project/requests/2.33.0/",
+    "watch": "requests"
+  },
+  "repository": {
+    "full_name": "octo-org/octo-app"
+  },
+  "sender": {
+    "login": "octo-bot"
+  }
+}
